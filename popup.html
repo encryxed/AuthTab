@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>AuthTab</title>
+  <link rel="stylesheet" href="base.css">
+  <link rel="stylesheet" href="popup.css">
+  <script type="module" src="popup.js"></script>
+</head>
+<body>
+  <header class="bar">
+    <span class="brand"><img src="icons/icon.svg" alt="">AuthTab</span>
+    <span class="actions">
+      <button id="lockBtn" class="icon" title="Lock now" aria-label="Lock now" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+      </button>
+      <button id="manageBtn" class="icon" title="Import and manage accounts" aria-label="Import and manage accounts">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+      </button>
+    </span>
+  </header>
+
+  <section id="view-new" class="panel" hidden>
+    <span class="lcd lcd-big" aria-hidden="true"><span class="digits" data-ghost="888 888">--- ---</span></span>
+    <h1>Your 2FA codes, right in Firefox</h1>
+    <p class="muted">Set a master password, then bring your accounts over from Google Authenticator.</p>
+    <button id="setupBtn" class="primary">Get started</button>
+  </section>
+
+  <section id="view-locked" class="panel" hidden>
+    <span class="lcd lcd-big" aria-hidden="true"><span class="digits" data-ghost="888 888">--- ---</span></span>
+    <form id="unlockForm">
+      <label for="password">Master password</label>
+      <input id="password" type="password" autocomplete="off" required>
+      <button id="unlockBtn" class="primary" type="submit">Unlock</button>
+      <p id="unlockError" class="error" role="alert"></p>
+    </form>
+  </section>
+
+  <section id="view-codes" hidden>
+    <div class="search"><input id="search" type="search" placeholder="Search · Enter copies the top code" autocomplete="off" aria-label="Search accounts"></div>
+    <ul id="list"></ul>
+    <div id="empty" class="panel" hidden>
+      <p class="muted">No accounts yet. Bring them over from your phone.</p>
+      <button id="importBtn" class="primary">Import from Google Authenticator</button>
+    </div>
+  </section>
+
+  <div id="toast" role="status"></div>
+</body>
+</html>

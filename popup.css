@@ -1,0 +1,60 @@
+body { width: 340px; min-height: 120px; font-size: 14.5px; }
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 8px 8px 14px;
+}
+.brand { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; letter-spacing: 0.01em; }
+.brand img { width: 18px; height: 18px; }
+.actions { display: flex; gap: 2px; }
+
+.panel { display: grid; justify-items: center; gap: 12px; padding: 18px 20px 22px; text-align: center; }
+.panel h1 { font-size: 18px; }
+.panel p { max-width: 30ch; }
+.panel .primary { width: 100%; }
+.lcd-big { padding: 12px 18px; }
+.lcd-big .digits { font-size: 30px; }
+
+#unlockForm { width: 100%; text-align: left; }
+#unlockForm label { display: block; margin-bottom: 6px; font-weight: 600; }
+#unlockForm button { width: 100%; margin-top: 12px; }
+
+.search { padding: 0 10px 8px; }
+
+#list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 470px;
+  overflow-y: auto;
+  border-top: 1px solid var(--seam-dark);
+}
+
+/* A moulded seam between rows: a dark line with a light line under it. */
+.account {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px 10px 14px;
+  border-top: 1px solid var(--seam-light);
+  border-bottom: 1px solid var(--seam-dark);
+  cursor: pointer;
+}
+.account:hover { background: var(--raised); }
+.account:focus-visible { outline-offset: -2px; }
+
+.meta { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.issuer, .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.issuer { font-size: 15px; font-weight: 600; }
+.name { color: var(--ink-muted); font-size: 12.5px; }
+
+/* Countdown ticks: six bars that go out top-down, like an old token's side display. */
+.ticks { display: flex; flex-direction: column-reverse; gap: 2px; }
+.ticks i { display: block; width: 5px; height: 2.5px; background: var(--lcd-ink); }
+.ticks i.off { background: var(--lcd-ghost); }
+
+.expiring .lcd { background: var(--backlight); }
+
+.account .icon.next { width: 28px; height: 28px; font-size: 16px; }

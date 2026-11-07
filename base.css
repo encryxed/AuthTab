@@ -1,0 +1,157 @@
+/* AuthTab is styled after a hardware key fob: matte plastic housing, printed labels,
+   and one LCD window where the codes live. The LCD is the only loud thing. */
+
+@font-face { font-family: "Barlow"; font-weight: 400; src: url("fonts/barlow-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Barlow"; font-weight: 500; src: url("fonts/barlow-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "Barlow"; font-weight: 600; src: url("fonts/barlow-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "Barlow"; font-weight: 700; src: url("fonts/barlow-latin-700-normal.woff2") format("woff2"); }
+@font-face { font-family: "DSEG7"; font-weight: 700; src: url("fonts/DSEG7Classic-Bold.woff2") format("woff2"); }
+
+:root {
+  /* housing */
+  --housing: #dedfda;
+  --raised: #e9eae6;
+  --well: #cfd0ca;
+  --seam-dark: rgba(30, 34, 28, 0.16);
+  --seam-light: rgba(255, 255, 255, 0.7);
+  --ink: #23261f;
+  --ink-muted: #686d64;
+  /* LCD: a physical material, identical in both themes */
+  --lcd: #a9b798;
+  --lcd-ink: #18210f;
+  --lcd-ghost: rgba(24, 33, 15, 0.1);
+  --backlight: #e9b949;
+  --danger: #b3261e;
+  --focus: #4d6b2f;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --housing: #25282d;
+    --raised: #2f333a;
+    --well: #1c1e22;
+    --seam-dark: rgba(0, 0, 0, 0.45);
+    --seam-light: rgba(255, 255, 255, 0.06);
+    --ink: #d9dcd4;
+    --ink-muted: #8d9389;
+    --danger: #ff8a7a;
+    --focus: #c3d3ad;
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--housing);
+  color: var(--ink);
+  font: 400 15px/1.45 "Barlow", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 { margin: 0; font-weight: 600; line-height: 1.2; letter-spacing: -0.005em; }
+p { margin: 0; }
+.muted { color: var(--ink-muted); }
+.error { color: var(--danger); min-height: 1.3em; margin-top: 8px; font-size: 14px; font-weight: 500; }
+[hidden] { display: none !important; }
+
+input, select, textarea, button { font: inherit; color: inherit; }
+
+/* Inputs are recessed slots moulded into the housing. */
+input[type="text"], input[type="password"], input[type="search"], input[type="number"], select, textarea {
+  width: 100%;
+  padding: 9px 12px;
+  background: var(--well);
+  border: 0;
+  border-radius: 7px;
+  box-shadow: inset 0 1px 2px var(--seam-dark), 0 1px 0 var(--seam-light);
+  outline: none;
+}
+input::placeholder, textarea::placeholder { color: var(--ink-muted); opacity: 0.8; }
+
+/* Buttons are rubber keys: raised, and they press in. */
+button, .key {
+  cursor: pointer;
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--raised);
+  font-weight: 600;
+  box-shadow: 0 1px 0 var(--seam-light) inset, 0 2px 0 var(--seam-dark), 0 3px 6px -3px var(--seam-dark);
+  transition: transform 0.06s, box-shadow 0.06s;
+}
+button:active:not(:disabled), .key:active {
+  transform: translateY(2px);
+  box-shadow: 0 0 0 var(--seam-dark), inset 0 1px 2px var(--seam-dark);
+}
+button:disabled { opacity: 0.45; cursor: default; }
+button.primary { background: var(--ink); color: var(--housing); }
+button.danger { color: var(--danger); }
+button.icon {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--ink-muted);
+}
+button.icon:hover:not(:disabled) { color: var(--ink); background: var(--raised); }
+button.icon svg { width: 18px; height: 18px; }
+
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+input:focus-visible, select:focus-visible, textarea:focus-visible { outline-offset: 0; }
+
+/* The LCD window */
+.lcd {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 11px 6px 9px;
+  border-radius: 5px;
+  background: var(--lcd);
+  color: var(--lcd-ink);
+  box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.28), inset 0 0 0 1px rgba(0, 0, 0, 0.22), 0 1px 0 var(--seam-light);
+  transition: background-color 0.5s;
+}
+.digits {
+  position: relative;
+  z-index: 0;
+  font: 700 19px/1 "DSEG7", monospace;
+  white-space: pre;
+  word-spacing: 0.35em;  /* DSEG's space is hair-thin; this splits codes into two readable halves */
+}
+/* Unlit segments, like a real LCD: every position shows a faint 8. */
+.digits::before {
+  content: attr(data-ghost);
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  color: var(--lcd-ghost);
+}
+
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: 14px;
+  z-index: 10;
+  transform: translate(-50%, 12px);
+  opacity: 0;
+  pointer-events: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: var(--ink);
+  color: var(--housing);
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: 0 6px 18px -6px rgba(0, 0, 0, 0.5);
+  transition: opacity 0.16s, transform 0.16s;
+}
+#toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; }
+}

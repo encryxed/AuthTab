@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AuthTab · Manage</title>
+  <link rel="icon" href="icons/icon.svg">
+  <link rel="stylesheet" href="base.css">
+  <link rel="stylesheet" href="manage.css">
+  <script src="lib/jsQR.js"></script>
+  <script type="module" src="manage.js"></script>
+</head>
+<body>
+  <!-- First run -->
+  <section id="view-setup" class="fob fob-solo" hidden>
+    <span class="brand"><img src="icons/icon.svg" alt="">AuthTab</span>
+    <span class="lcd lcd-hero" aria-hidden="true"><span class="digits" data-ghost="888 888">--- ---</span></span>
+    <h1>Create your master password</h1>
+    <p class="muted">Your 2FA secrets are encrypted with it before they're saved. There's no reset: if you forget it, you'll need to import again from your phone, where your codes stay safe.</p>
+    <form id="setupForm">
+      <label>Master password <input id="newPassword" type="password" autocomplete="new-password" minlength="8" required></label>
+      <label>Type it again <input id="confirmPassword" type="password" autocomplete="new-password" required></label>
+      <button id="setupBtn" class="primary" type="submit">Create vault</button>
+      <p id="setupError" class="error" role="alert"></p>
+    </form>
+  </section>
+
+  <!-- Locked -->
+  <section id="view-locked" class="fob fob-solo" hidden>
+    <span class="brand"><img src="icons/icon.svg" alt="">AuthTab</span>
+    <span class="lcd lcd-hero" aria-hidden="true"><span class="digits" data-ghost="888 888">--- ---</span></span>
+    <h1>Unlock AuthTab</h1>
+    <form id="unlockForm">
+      <label>Master password <input id="password" type="password" autocomplete="off" required></label>
+      <button id="unlockBtn" class="primary" type="submit">Unlock</button>
+      <p id="unlockError" class="error" role="alert"></p>
+    </form>
+  </section>
+
+  <div id="view-main" class="layout" hidden>
+    <aside class="fob">
+      <span class="brand"><img src="icons/icon.svg" alt="">AuthTab</span>
+      <span class="lcd lcd-count">
+        <span class="digits" data-ghost="88" id="deviceCount">00</span>
+        <span class="lcd-label">accounts</span>
+      </span>
+      <nav aria-label="Sections">
+        <a href="#import">Import</a>
+        <a href="#accounts">Accounts</a>
+        <a href="#backup">Backup</a>
+        <a href="#security">Security</a>
+      </nav>
+      <button id="lockBtn" hidden>Lock now</button>
+    </aside>
+
+    <main>
+      <!-- Import -->
+      <section id="import" class="block">
+        <h2>Import from Google Authenticator</h2>
+        <ol class="steps">
+          <li>On your phone, open <b>Google Authenticator</b>, tap the <b>menu</b>, then <b>Transfer accounts → Export accounts</b>.</li>
+          <li>Pick your accounts and tap <b>Next</b>. Exporting copies them, so nothing leaves your phone.</li>
+          <li>Bring the QR code it shows into this page.</li>
+        </ol>
+
+        <label id="dropZone" class="drop">
+          <input id="fileInput" type="file" accept="image/*" multiple>
+          <svg class="finder" viewBox="0 0 40 40" aria-hidden="true"><path d="M2 12V2h10M28 2h10v10M38 28v10H28M12 38H2V28" fill="none" stroke="currentColor" stroke-width="3"/><rect x="11" y="11" width="18" height="18" rx="2" fill="currentColor" opacity=".25"/></svg>
+          <span class="drop-title">Drop a photo or screenshot of the QR code</span>
+          <span class="muted">or click to choose one, or paste it with <kbd>Ctrl</kbd> <kbd>V</kbd></span>
+        </label>
+        <p class="hint muted">Phone blocks screenshots of that screen? Take a photo of it with another phone, or hold it up to your webcam.</p>
+
+        <div class="row">
+          <button id="cameraBtn">📷 Scan with webcam</button>
+        </div>
+        <div id="cameraBox" class="camera" hidden>
+          <video id="video" playsinline muted></video>
+          <p class="muted">Hold the phone screen up to the camera. Big exports have several QR codes. Tap Next on your phone and keep scanning.</p>
+        </div>
+
+        <details>
+          <summary>Paste an <code>otpauth://</code> or <code>otpauth-migration://</code> link</summary>
+          <textarea id="linkInput" rows="3" placeholder="otpauth-migration://offline?data=…"></textarea>
+          <button id="linkBtn">Read link</button>
+        </details>
+
+        <details>
+          <summary>Add an account with its secret key</summary>
+          <form id="manualForm" class="grid">
+            <label>Service <input id="mIssuer" type="text" placeholder="GitHub"></label>
+            <label>Account <input id="mName" type="text" placeholder="you@example.com"></label>
+            <label class="wide">Secret key <input id="mSecret" type="text" placeholder="JBSW Y3DP EHPK 3PXP" required autocomplete="off" spellcheck="false"></label>
+            <label>Type
+              <select id="mType"><option value="totp">Time-based</option><option value="hotp">Counter-based</option></select>
+            </label>
+            <label>Digits
+              <select id="mDigits"><option>6</option><option>7</option><option>8</option></select>
+            </label>
+            <label>Algorithm
+              <select id="mAlgorithm"><option>SHA1</option><option>SHA256</option><option>SHA512</option></select>
+            </label>
+            <label>Period in seconds <input id="mPeriod" type="number" value="30" min="1"></label>
+            <div class="wide">
+              <button class="primary" type="submit">Add account</button>
+              <p id="manualError" class="error" role="alert"></p>
+            </div>
+          </form>
+        </details>
+
+        <div id="preview" class="tray" hidden>
+          <h3 id="previewTitle"></h3>
+          <p id="batchNotice" class="notice" hidden></p>
+          <ul id="pendingList"></ul>
+          <ul id="importErrors" class="errors"></ul>
+          <div class="row">
+            <button id="commitBtn" class="primary">Add</button>
+            <button id="discardBtn">Discard</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Accounts -->
+      <section id="accounts" class="block">
+        <h2>Your accounts <span id="accountCount" class="muted"></span></h2>
+        <p id="accountsEmpty" class="muted">Nothing here yet. Import your accounts above.</p>
+        <ul id="accountList"></ul>
+      </section>
+
+      <!-- Backup -->
+      <section id="backup" class="block">
+        <h2>Backup</h2>
+        <p class="muted">The backup file is encrypted with your current master password. Keep a copy off this computer, like on a USB stick or your cloud drive.</p>
+        <div class="row">
+          <button id="exportBtn">Download backup</button>
+          <label class="key">Restore a backup <input id="restoreFile" type="file" accept=".json,application/json" hidden></label>
+        </div>
+        <form id="restoreForm" class="stack" hidden>
+          <label>Password for that backup <input id="restorePassword" type="password" autocomplete="off" required></label>
+          <button class="primary" type="submit">Open backup</button>
+          <p id="restoreError" class="error" role="alert"></p>
+        </form>
+      </section>
+
+      <!-- Security -->
+      <section id="security" class="block">
+        <h2>Security</h2>
+        <label class="inline">Lock automatically after
+          <select id="autoLock">
+            <option value="5">5 minutes</option>
+            <option value="15">15 minutes</option>
+            <option value="60">1 hour</option>
+            <option value="240">4 hours</option>
+            <option value="0">Firefox closes</option>
+          </select>
+        </label>
+
+        <details>
+          <summary>Change master password</summary>
+          <form id="passwordForm" class="stack">
+            <label>Current password <input id="currentPassword" type="password" autocomplete="off" required></label>
+            <label>New password <input id="nextPassword" type="password" autocomplete="new-password" minlength="8" required></label>
+            <label>New password again <input id="nextPassword2" type="password" autocomplete="new-password" required></label>
+            <button class="primary" type="submit">Change password</button>
+            <p id="passwordError" class="error" role="alert"></p>
+          </form>
+        </details>
+
+        <details>
+          <summary class="danger-text">Erase AuthTab data</summary>
+          <p class="muted">Deletes the vault from this browser. Your phone and backup files aren't touched.</p>
+          <button id="eraseBtn" class="danger">Erase AuthTab data</button>
+        </details>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast" role="status"></div>
+</body>
+</html>
