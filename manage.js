@@ -1,6 +1,9 @@
 import * as vault from './lib/vault.js';
+import * as sync from './lib/sync.js';
+import * as drive from './lib/gdrive.js';
 import { makeAccount } from './lib/otp.js';
 import { parseText } from './lib/migration.js';
+import { decodeImage, UnreadableImageError } from './lib/qr.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -42,6 +45,11 @@ function show(view) {
   $('lockBtn').hidden = view !== 'main';
 }
 
+// The form's own submit button, also when the form was submitted without a click.
+function submitButton(event) {
+  return event.submitter ?? event.target.querySelector('button[type="submit"]');
+}
+
 async function busy(button, label, task) {
   const original = button.textContent;
   button.disabled = true;
@@ -78,6 +86,7 @@ function mutate(change) {
     change(accounts);
     await vault.saveAccounts(accounts);
     renderAccounts();
+    runSync();
   });
 }
 
@@ -103,6 +112,7 @@ async function showMain() {
   $('autoLock').value = String((await vault.getSettings()).autoLockMinutes);
   show('main');
   if (location.hash) document.querySelector(location.hash)?.scrollIntoView();
+  runSync();
 }
 
 // ---------- Setup & unlock ----------
@@ -140,9 +150,17 @@ $('lockBtn').addEventListener('click', async () => {
 
 // ---------- Import ----------
 
-function handleText(text, source) {
+// `quiet` is for the webcam, which sees the same QR code many times a second.
+function handleText(text, source, { quiet = false } = {}) {
   const trimmed = text.trim();
-  if (!trimmed || seenCodes.has(trimmed)) return 0;
+  if (!trimmed) return 0;
+  if (seenCodes.has(trimmed)) {
+    if (!quiet) {
+      toast('👀 Already read that one. Its accounts are in the list below');
+      $('preview').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+    return 0;
+  }
   seenCodes.add(trimmed);
 
   const result = parseText(trimmed);
@@ -242,35 +260,46 @@ $('commitBtn').addEventListener('click', async () => {
 
 $('discardBtn').addEventListener('click', resetImport);
 
-// Tries a few sizes: photos of screens decode better scaled down, tiny screenshots better as-is.
-async function decodeImage(blob) {
-  const bitmap = await createImageBitmap(blob);
-  const canvas = document.createElement('canvas');
-  const context = canvas.getContext('2d', { willReadFrequently: true });
-  try {
-    const longest = Math.max(bitmap.width, bitmap.height);
-    const scales = new Set([1200, 2000, 800, 500].map((max) => Math.min(1, max / longest)));
-    for (const scale of scales) {
-      canvas.width = Math.round(bitmap.width * scale);
-      canvas.height = Math.round(bitmap.height * scale);
-      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-      const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
-      const hit = jsQR(data, canvas.width, canvas.height, { inversionAttempts: 'attemptBoth' });
-      if (hit?.data) return hit.data;
+// Any file is attempted: pasted images and some downloads arrive without a file type.
+async function handleFiles(files) {
+  if (files.length === 0) {
+    toast("📋 That wasn't an image. Copy the QR code picture itself, or a screenshot of it");
+    return;
+  }
+  for (const file of files) {
+    if (/^(video|audio|text)\//.test(file.type) || file.type === 'application/pdf') {
+      toast(`⚠️ "${file.name}" isn't an image. Use a screenshot or photo of the QR code`);
+      continue;
     }
-    return null;
-  } finally {
-    bitmap.close();
+    // Clipboard images get generic names like "image.png"; don't echo those back.
+    const generic = !file.name || /^(image\.\w+|pasted image)$/i.test(file.name);
+    const label = generic ? 'the image' : `"${file.name}"`;
+    dropZone.classList.add('reading');
+    toast('🔍 Reading the QR code…');
+    try {
+      const text = await decodeImage(file, file.name || 'image');
+      if (text) handleText(text, label);
+      else toast(`😕 No QR code found in ${label}. Try a sharper shot with the whole code in view`);
+    } catch (err) {
+      toast(`⚠️ ${err instanceof UnreadableImageError ? err.message : `Couldn't read ${label}`}`);
+    } finally {
+      dropZone.classList.remove('reading');
+    }
   }
 }
 
-async function handleFiles(files) {
-  for (const file of files) {
-    if (!file.type.startsWith('image/')) continue;
-    const text = await decodeImage(file).catch(() => null);
-    if (text) handleText(text, file.name || 'the image');
-    else toast(`😕 No QR code found in ${file.name || 'that image'}. Try a sharper, closer shot`);
+// Text from the clipboard: an otpauth link, an image as a data: URL, or an image's web address.
+async function handlePastedText(text) {
+  const trimmed = text.trim();
+  if (/^data:image\//i.test(trimmed)) {
+    const blob = await (await fetch(trimmed)).blob();
+    return handleFiles([new File([blob], 'pasted image', { type: blob.type })]);
   }
+  if (/^https?:\/\/\S+$/i.test(trimmed) && !/otpauth/i.test(trimmed)) {
+    toast('📋 That copied the image\'s address. Right-click the QR code, choose "Copy Image", and paste again');
+    return;
+  }
+  handleText(trimmed, 'the clipboard');
 }
 
 $('fileInput').addEventListener('change', async () => {
@@ -287,23 +316,48 @@ dropZone.addEventListener('dragleave', () => dropZone.classList.remove('over'));
 dropZone.addEventListener('drop', (event) => {
   event.preventDefault();
   dropZone.classList.remove('over');
-  handleFiles([...event.dataTransfer.files]);
+  const files = [...event.dataTransfer.files];
+  // An image dragged from a web page may arrive only as its address.
+  if (files.length === 0 && event.dataTransfer.getData('text/plain')) handlePastedText(event.dataTransfer.getData('text/plain'));
+  else handleFiles(files);
 });
 
 document.addEventListener('paste', (event) => {
   if ($('view-main').hidden) return;
-  const images = [...event.clipboardData.files].filter((file) => file.type.startsWith('image/'));
-  if (images.length) {
+  // clipboardData.items catches images that clipboardData.files misses in some copy sources.
+  const files = [...event.clipboardData.items]
+    .filter((item) => item.kind === 'file')
+    .map((item) => item.getAsFile())
+    .filter(Boolean);
+  if (files.length) {
     event.preventDefault();
-    handleFiles(images);
+    handleFiles(files);
     return;
   }
   if (event.target.closest('input, textarea')) return;
-  const text = event.clipboardData.getData('text');
-  if (text) {
-    event.preventDefault();
-    handleText(text, 'the clipboard');
+  const text = event.clipboardData.getData('text/plain');
+  event.preventDefault();
+  if (text) handlePastedText(text);
+  else toast('📋 Nothing to paste. Copy the QR code image first');
+});
+
+// For when Ctrl+V doesn't reach the page. Firefox may show a small "Paste" button to confirm.
+$('pasteBtn').addEventListener('click', async () => {
+  let items;
+  try {
+    items = await navigator.clipboard.read();
+  } catch {
+    toast('📋 Firefox didn\'t allow reading the clipboard. Click this page and press Ctrl+V instead');
+    return;
   }
+  for (const item of items) {
+    const type = item.types.find((t) => t.startsWith('image/'));
+    if (type) return handleFiles([new File([await item.getType(type)], 'pasted image', { type })]);
+  }
+  for (const item of items) {
+    if (item.types.includes('text/plain')) return handlePastedText(await (await item.getType('text/plain')).text());
+  }
+  toast('📋 Your clipboard is empty. Copy the QR code image first');
 });
 
 $('linkBtn').addEventListener('click', () => {
@@ -335,7 +389,7 @@ async function startCamera() {
       context.drawImage(video, 0, 0);
       const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
       const hit = jsQR(data, canvas.width, canvas.height, { inversionAttempts: 'attemptBoth' });
-      if (hit?.data) handleText(hit.data, 'the camera');
+      if (hit?.data) handleText(hit.data, 'the camera', { quiet: true });
     }
     setTimeout(scan, 200);
   };
@@ -491,7 +545,7 @@ $('restoreFile').addEventListener('change', async () => {
 
 $('restoreForm').addEventListener('submit', async (event) => {
   event.preventDefault();
-  const button = event.submitter;
+  const button = submitButton(event);
   const found = await busy(button, 'Opening…', () => vault.decryptBackup(restoreData, $('restorePassword').value));
   if (!found) {
     $('restoreError').textContent = 'Wrong password for this backup 🙅';
@@ -527,20 +581,182 @@ $('passwordForm').addEventListener('submit', async (event) => {
   const next = $('nextPassword').value;
   if (next.length < 8) return void ($('passwordError').textContent = 'Use at least 8 characters.');
   if (next !== $('nextPassword2').value) return void ($('passwordError').textContent = "The new passwords don't match.");
-  const ok = await busy(event.submitter, 'Changing…', () => vault.changePassword($('currentPassword').value, next));
+  const ok = await busy(submitButton(event), 'Changing…', async () => {
+    await sync.syncNow();  // pick up other computers' changes before the key changes
+    return vault.changePassword($('currentPassword').value, next);
+  });
   if (!ok) return void ($('passwordError').textContent = 'Your current password is wrong.');
   $('passwordForm').reset();
+  await sync.replaceRemote();
+  await renderSync();
   toast('🔑 Password changed. Download a fresh backup too!');
 });
 
 $('eraseBtn').addEventListener('click', async () => {
-  if (!confirm('Erase all AuthTab data from this browser?\n\nYour phone and any backup files are not affected.')) return;
+  if (!confirm('Erase all AuthTab data from this browser?\n\nYour phone, Google Drive and any backup files are not affected.')) return;
+  await sync.disconnect({ deleteRemote: false }).catch(() => {});
   await vault.erase();
   resetImport();
   history.replaceState(null, '', location.pathname);
   await init();
   toast('🧹 Erased');
 });
+
+// ---------- Google Drive sync ----------
+
+function ago(time) {
+  const minutes = Math.round((Date.now() - time) / 60_000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  if (minutes < 24 * 60) return `${Math.round(minutes / 60)} h ago`;
+  return new Date(time).toLocaleDateString();
+}
+
+const SYNC_PROBLEMS = {
+  signin: 'Google signed AuthTab out, so syncing is paused. Sign in again to continue.',
+  password:
+    'The vault in Google Drive uses a different master password, probably the one from another computer. Enter it to combine both vaults. After that, this browser uses that password too.',
+};
+
+async function renderSync(syncing = false) {
+  const config = await sync.getConfig();
+  $('redirectUri').value = drive.redirectUri();
+  $('syncOff').hidden = Boolean(config);
+  $('syncOn').hidden = !config;
+  if (!config) return;
+
+  $('syncWho').textContent = `Signed in as ${config.email}`;
+  $('syncWhen').textContent = syncing ? 'Syncing…' : config.lastSync ? `Last synced ${ago(config.lastSync)}` : 'Not synced yet';
+  const problem = syncing ? '' : (SYNC_PROBLEMS[config.status] ?? (config.status === 'error' ? `Sync failed: ${config.message}` : ''));
+  $('syncProblem').hidden = !problem;
+  $('syncProblem').textContent = problem;
+  $('syncPasswordForm').hidden = syncing || config.status !== 'password';
+  $('reconnectBtn').hidden = syncing || config.status !== 'signin';
+  $('syncNowBtn').disabled = syncing;
+}
+
+async function runSync() {
+  if (!(await sync.getConfig())) return renderSync();
+  await renderSync(true);
+  const result = await sync.syncNow();
+  if (result === 'updated') {
+    accounts = await vault.loadAccounts();
+    renderAccounts();
+  }
+  await renderSync();
+}
+
+// Must be the first thing awaited in a click handler: Firefox only shows permission
+// prompts in direct response to the click.
+function askSyncPermission() {
+  return browser.permissions.request({ origins: drive.ORIGINS, data_collection: ['authenticationInfo'] });
+}
+
+function googleError(err) {
+  return `${err.message}. Check the client ID, and that the redirect URI from the setup steps is added to it exactly.`;
+}
+
+$('copyRedirect').addEventListener('click', async () => {
+  await navigator.clipboard.writeText($('redirectUri').value);
+  toast('📋 Redirect URI copied');
+});
+
+$('connectForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const clientId = $('clientId').value.trim();
+  $('connectError').textContent = '';
+  if (!(await askSyncPermission())) {
+    $('connectError').textContent = 'Sync needs those permissions. Nothing was changed.';
+    return;
+  }
+  try {
+    await busy($('connectBtn'), 'Waiting for Google…', () => sync.connect(clientId));
+  } catch (err) {
+    $('connectError').textContent = googleError(err);
+    return;
+  }
+  $('connectForm').reset();
+  toast('☁️ Signed in. Syncing your vault');
+  await runSync();
+});
+
+$('reconnectBtn').addEventListener('click', async () => {
+  try {
+    await sync.reconnect();
+  } catch (err) {
+    toast(`⚠️ ${err.message}`);
+  }
+  await runSync();
+});
+
+$('syncNowBtn').addEventListener('click', runSync);
+
+$('syncPasswordForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  $('syncPasswordError').textContent = '';
+  const ok = await busy(submitButton(event), 'Combining…', () => sync.adoptWithPassword($('syncPassword').value));
+  if (!ok) return void ($('syncPasswordError').textContent = "That's not the password for the vault in Google Drive.");
+  $('syncPasswordForm').reset();
+  accounts = await vault.loadAccounts();
+  renderAccounts();
+  await renderSync();
+  toast('🔗 Vaults combined. Use that master password from now on');
+});
+
+$('disconnectBtn').addEventListener('click', async () => {
+  const deleteRemote = $('deleteRemote').checked;
+  try {
+    await sync.disconnect({ deleteRemote });
+  } catch (err) {
+    toast(`⚠️ Couldn't delete the Drive copy: ${err.message}`);
+    return;
+  }
+  $('deleteRemote').checked = false;
+  await renderSync();
+  toast(deleteRemote ? '☁️ Sync off. Drive copy deleted' : '☁️ Sync off. Your codes stay in this browser');
+});
+
+// Restoring onto a fresh install
+let restoreBlob = null;
+
+$('restoreDriveForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const clientId = $('restoreClientId').value.trim();
+  $('restoreDriveError').textContent = '';
+  if (!(await askSyncPermission())) {
+    $('restoreDriveError').textContent = 'Restoring needs those permissions.';
+    return;
+  }
+  try {
+    restoreBlob = await busy($('restoreDriveBtn'), 'Waiting for Google…', () => sync.fetchForRestore(clientId));
+  } catch (err) {
+    $('restoreDriveError').textContent = googleError(err);
+    return;
+  }
+  if (!restoreBlob) {
+    $('restoreDriveError').textContent = "There's no AuthTab vault in that Google account yet. Create a new vault above and it will sync there automatically.";
+    return;
+  }
+  $('restoreDriveEmail').textContent = (await sync.getConfig()).email;
+  $('restoreDriveForm').hidden = true;
+  $('restoreDrivePwForm').hidden = false;
+  $('restoreDrivePassword').focus();
+});
+
+$('restoreDrivePwForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  $('restoreDrivePwError').textContent = '';
+  const ok = await busy($('restoreDriveUnlock'), 'Restoring…', () => vault.adoptRemote(restoreBlob, $('restoreDrivePassword').value));
+  if (!ok) return void ($('restoreDrivePwError').textContent = 'Wrong password for that vault 🙅');
+  restoreBlob = null;
+  $('restoreDrivePwForm').reset();
+  await showMain();
+  toast(`🎉 Restored ${plural(accounts.length, 'account')} from Google Drive`);
+});
+
+setInterval(() => {
+  if (!$('view-main').hidden) runSync();
+}, 60_000);
 
 // ---------- Auto-lock while this tab sits open ----------
 

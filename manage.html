@@ -23,6 +23,21 @@
       <button id="setupBtn" class="primary" type="submit">Create vault</button>
       <p id="setupError" class="error" role="alert"></p>
     </form>
+    <details id="restoreDrive">
+      <summary>Already use AuthTab with Google Drive sync? Restore it here</summary>
+      <form id="restoreDriveForm">
+        <label>Google client ID <input id="restoreClientId" type="text" placeholder="1234…apps.googleusercontent.com" autocomplete="off" spellcheck="false" required></label>
+        <p class="muted small">Use the same client ID as on your other computer.</p>
+        <button id="restoreDriveBtn" class="primary" type="submit">Sign in with Google</button>
+        <p id="restoreDriveError" class="error" role="alert"></p>
+      </form>
+      <form id="restoreDrivePwForm" hidden>
+        <p>Found your vault in <b id="restoreDriveEmail"></b>. Enter the master password you use with it.</p>
+        <label>Master password <input id="restoreDrivePassword" type="password" autocomplete="off" required></label>
+        <button id="restoreDriveUnlock" class="primary" type="submit">Restore my accounts</button>
+        <p id="restoreDrivePwError" class="error" role="alert"></p>
+      </form>
+    </details>
   </section>
 
   <!-- Locked -->
@@ -47,6 +62,7 @@
       <nav aria-label="Sections">
         <a href="#import">Import</a>
         <a href="#accounts">Accounts</a>
+        <a href="#sync">Sync</a>
         <a href="#backup">Backup</a>
         <a href="#security">Security</a>
       </nav>
@@ -64,14 +80,16 @@
         </ol>
 
         <label id="dropZone" class="drop">
-          <input id="fileInput" type="file" accept="image/*" multiple>
+          <input id="fileInput" type="file" accept="image/*,.png,.jpg,.jpeg,.webp,.gif,.bmp,.avif,.svg,.ico,.tif,.tiff" multiple>
           <svg class="finder" viewBox="0 0 40 40" aria-hidden="true"><path d="M2 12V2h10M28 2h10v10M38 28v10H28M12 38H2V28" fill="none" stroke="currentColor" stroke-width="3"/><rect x="11" y="11" width="18" height="18" rx="2" fill="currentColor" opacity=".25"/></svg>
           <span class="drop-title">Drop a photo or screenshot of the QR code</span>
           <span class="muted">or click to choose one, or paste it with <kbd>Ctrl</kbd> <kbd>V</kbd></span>
+          <span class="muted small">PNG, JPG, WebP, GIF, BMP, AVIF or SVG</span>
         </label>
-        <p class="hint muted">Phone blocks screenshots of that screen? Take a photo of it with another phone, or hold it up to your webcam.</p>
+        <p class="hint muted">Phone blocks screenshots of that screen? Take a photo of it with another phone, or hold it up to your webcam. A full-screen screenshot works too; the QR code doesn't need to be cropped.</p>
 
         <div class="row">
+          <button id="pasteBtn">📋 Paste from clipboard</button>
           <button id="cameraBtn">📷 Scan with webcam</button>
         </div>
         <div id="cameraBox" class="camera" hidden>
@@ -125,6 +143,51 @@
         <h2>Your accounts <span id="accountCount" class="muted"></span></h2>
         <p id="accountsEmpty" class="muted">Nothing here yet. Import your accounts above.</p>
         <ul id="accountList"></ul>
+      </section>
+
+      <!-- Sync -->
+      <section id="sync" class="block">
+        <h2>Sync with Google Drive</h2>
+        <div id="syncOff">
+          <p class="muted">Keep AuthTab the same on every computer. Your vault goes into a hidden AuthTab folder in your own Google Drive, still encrypted with your master password, so Google can't read your codes. AuthTab can't see any of your other Drive files.</p>
+          <details id="syncSetup">
+            <summary>One-time setup: make your Google sign-in key</summary>
+            <ol class="steps">
+              <li>In the <a href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noopener">Google Cloud console</a>, create a project called AuthTab. It's free.</li>
+              <li>Open the <a href="https://console.cloud.google.com/apis/library/drive.googleapis.com" target="_blank" rel="noopener">Google Drive API</a> page and click <b>Enable</b>.</li>
+              <li>Open <a href="https://console.cloud.google.com/auth/overview" target="_blank" rel="noopener">Google Auth Platform</a>, click <b>Get started</b>, name the app AuthTab and choose <b>External</b>. Then under <a href="https://console.cloud.google.com/auth/audience" target="_blank" rel="noopener">Audience</a>, add your Gmail address as a <b>test user</b>.</li>
+              <li>Under <a href="https://console.cloud.google.com/auth/clients/create" target="_blank" rel="noopener">Clients</a>, create a <b>Web application</b> client and add this as an <b>Authorized redirect URI</b>:
+                <span class="copy-row"><input id="redirectUri" type="text" readonly aria-label="Redirect URI"><button id="copyRedirect" type="button">Copy</button></span>
+              </li>
+              <li>Copy the <b>Client ID</b> Google shows you and paste it below.</li>
+            </ol>
+          </details>
+          <form id="connectForm" class="stack">
+            <label>Google client ID <input id="clientId" type="text" placeholder="1234…apps.googleusercontent.com" autocomplete="off" spellcheck="false" required></label>
+            <button id="connectBtn" class="primary" type="submit">Sign in with Google</button>
+            <p id="connectError" class="error" role="alert"></p>
+          </form>
+        </div>
+
+        <div id="syncOn" hidden>
+          <p id="syncWho"></p>
+          <p id="syncWhen" class="muted"></p>
+          <p id="syncProblem" class="notice" hidden></p>
+          <form id="syncPasswordForm" class="stack" hidden>
+            <label>Master password used with Google Drive <input id="syncPassword" type="password" autocomplete="off" required></label>
+            <button class="primary" type="submit">Combine vaults</button>
+            <p id="syncPasswordError" class="error" role="alert"></p>
+          </form>
+          <div class="row">
+            <button id="syncNowBtn">Sync now</button>
+            <button id="reconnectBtn" class="primary" hidden>Sign in again</button>
+          </div>
+          <details>
+            <summary>Turn off sync</summary>
+            <label class="check"><input id="deleteRemote" type="checkbox"> Also delete AuthTab's copy from Google Drive</label>
+            <button id="disconnectBtn" class="danger">Turn off sync</button>
+          </details>
+        </div>
       </section>
 
       <!-- Backup -->

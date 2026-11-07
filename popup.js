@@ -1,4 +1,5 @@
 import * as vault from './lib/vault.js';
+import * as sync from './lib/sync.js';
 import { hotp, totpCounter, secondsLeft, formatCode } from './lib/otp.js';
 
 const $ = (id) => document.getElementById(id);
@@ -131,9 +132,17 @@ async function nextHotp(row) {
     await vault.saveAccounts(accounts);
     row.account.counter = stored.counter;
     await tick();
+    sync.syncNow();
   } catch (err) {
     if (err instanceof vault.LockedError) init();
     else toast(`⚠️ ${err.message}`);
+  }
+}
+
+function applyFilter() {
+  const query = $('search').value.trim().toLowerCase();
+  for (const row of rows) {
+    row.li.hidden = Boolean(query) && !`${row.account.issuer} ${row.account.name}`.toLowerCase().includes(query);
   }
 }
 
@@ -143,10 +152,29 @@ async function showCodes() {
   $('list').replaceChildren(...rows.map((row) => row.li));
   $('empty').hidden = rows.length > 0;
   $('search').parentElement.hidden = rows.length === 0;
+  applyFilter();
   show('codes');
   await tick();
   $('search').focus();
   vault.touch();
+}
+
+function setSyncIcon(state, title) {
+  $('syncBtn').dataset.state = state;
+  $('syncBtn').title = title;
+  $('syncBtn').setAttribute('aria-label', title);
+}
+
+// Pulls changes from other computers after the codes are already on screen.
+async function syncInBackground() {
+  const config = await sync.getConfig();
+  $('syncBtn').hidden = !config;
+  if (!config) return;
+  setSyncIcon('busy', 'Syncing with Google Drive…');
+  const result = await sync.syncNow();
+  if (result === 'updated') await showCodes();
+  const problem = ['signin', 'password', 'error'].includes(result);
+  setSyncIcon(problem ? 'warn' : 'ok', problem ? 'Sync needs attention. Click to fix it' : `Synced with ${config.email}`);
 }
 
 async function init() {
@@ -160,6 +188,7 @@ async function init() {
     $('password').focus();
   } else {
     await showCodes();
+    syncInBackground();
   }
 }
 
@@ -174,18 +203,14 @@ $('unlockForm').addEventListener('submit', async (event) => {
   if (ok) {
     $('password').value = '';
     await showCodes();
+    syncInBackground();
   } else {
     $('unlockError').textContent = 'Wrong password 🙅';
     $('password').select();
   }
 });
 
-$('search').addEventListener('input', () => {
-  const query = $('search').value.trim().toLowerCase();
-  for (const row of rows) {
-    row.li.hidden = Boolean(query) && !`${row.account.issuer} ${row.account.name}`.toLowerCase().includes(query);
-  }
-});
+$('search').addEventListener('input', applyFilter);
 
 $('search').addEventListener('keydown', async (event) => {
   if (event.key !== 'Enter') return;
@@ -202,6 +227,7 @@ $('lockBtn').addEventListener('click', async () => {
 $('manageBtn').addEventListener('click', () => openManager());
 $('setupBtn').addEventListener('click', () => openManager());
 $('importBtn').addEventListener('click', () => openManager('#import'));
+$('syncBtn').addEventListener('click', () => openManager('#sync'));
 
 setInterval(tick, 250);
 init();

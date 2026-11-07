@@ -92,6 +92,8 @@ form .error { margin-top: -6px; }
   cursor: pointer;
 }
 .drop:hover, .drop.over { outline: 2px solid var(--focus); outline-offset: 0; }
+.drop.reading { cursor: progress; opacity: 0.7; }
+.drop .small { font-size: 13px; }
 .drop input { display: none; }
 .finder { width: 40px; height: 40px; margin-bottom: 8px; color: var(--ink-muted); }
 .drop-title { font-weight: 600; font-size: 17px; }
@@ -152,6 +154,16 @@ details > form { margin-top: 14px; }
 .acct .tools .delete { width: auto; padding: 0 10px; color: var(--danger); font-size: 14px; }
 
 label.key { display: inline-block; font-weight: 600; }
+
+#syncWho { font-weight: 600; }
+#syncOn .notice { margin-top: 12px; max-width: 62ch; }
+.steps a { color: inherit; text-decoration-thickness: 1px; text-underline-offset: 2px; }
+.copy-row { display: flex; gap: 8px; margin-top: 8px; }
+.copy-row input { font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
+label.check { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-weight: 400; }
+label.check input { width: 18px; height: 18px; margin: 0; accent-color: var(--ink); }
+.fob-solo details form { margin-top: 14px; }
+.fob-solo .small { margin-top: -6px; font-size: 13.5px; }
 .danger-text { color: var(--danger); }
 
 @media (max-width: 860px) {

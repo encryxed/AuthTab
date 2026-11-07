@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "AuthTab",
-  "version": "1.0.0",
-  "description": "Your Google Authenticator 2FA codes in a Firefox toolbar popup. Encrypted with your master password, fully offline.",
+  "version": "1.1.0",
+  "description": "Your Google Authenticator 2FA codes in a Firefox toolbar popup. Encrypted with your master password, with optional sync through your own Google Drive.",
   "author": "encryxed",
   "icons": {
     "48": "icons/icon.svg",
@@ -23,12 +23,13 @@
       "description": "Open AuthTab"
     }
   },
-  "permissions": ["storage", "clipboardWrite"],
+  "permissions": ["storage", "clipboardWrite", "identity"],
+  "optional_host_permissions": ["https://www.googleapis.com/*", "https://oauth2.googleapis.com/*"],
   "browser_specific_settings": {
     "gecko": {
       "id": "authtab@encryxed",
       "strict_min_version": "140.0",
-      "data_collection_permissions": { "required": ["none"] }
+      "data_collection_permissions": { "required": ["none"], "optional": ["authenticationInfo"] }
     }
   }
 }
