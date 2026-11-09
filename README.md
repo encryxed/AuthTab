@@ -1,12 +1,12 @@
-# 🔐 AuthTab
+# AuthTab
 
 Your Google Authenticator 2FA codes in a Firefox toolbar popup. Click to copy, type to search, and it works fully offline.
 
-- 📲 **Imports straight from Google Authenticator**: snap or screenshot its *Transfer accounts* QR code, scan it with your webcam, or paste the link. Works with standard `otpauth://` QR codes from any site too.
-- 🔒 **Encrypted at rest**: secrets are stored with AES-256-GCM, keyed from your master password (PBKDF2-SHA256, 600k iterations). The unlocked key lives only in memory and auto-locks.
-- ⚡ **Fast**: <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>2</kbd> opens the popup. Type part of a name and press <kbd>Enter</kbd> to copy that code.
-- ☁️ **Optional Google Drive sync**: sign in with Google and AuthTab keeps every computer in step through a hidden app folder in *your own* Drive. Only the encrypted vault is uploaded, so Google can't read your codes. It merges edits from several computers and remembers deletions.
-- 🙅 **Offline unless you turn sync on**: no tracking, no AuthTab servers. Google permissions are only requested when you enable sync.
+-  **Imports straight from Google Authenticator**: snap or screenshot its *Transfer accounts* QR code, scan it with your webcam, or paste the link. Works with standard `otpauth://` QR codes from any site too.
+-  **Encrypted at rest**: secrets are stored with AES-256-GCM, keyed from your master password (PBKDF2-SHA256, 600k iterations). The unlocked key lives only in memory and auto-locks.
+-  **Fast**: <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>2</kbd> opens the popup. Type part of a name and press <kbd>Enter</kbd> to copy that code.
+-  **Optional Google Drive sync**: sign in with Google and AuthTab keeps every computer in step through a hidden app folder in *your own* Drive. Only the encrypted vault is uploaded, so Google can't read your codes. It merges edits from several computers and remembers deletions.
+-  **Offline unless you turn sync on**: no tracking, no AuthTab servers. Google permissions are only requested when you enable sync.
 
 > Google doesn't let other apps read Google Authenticator's own cloud backup, so the first move from your phone is always via its export QR code. After that, sync handles the rest.
 
